@@ -25,7 +25,6 @@ public class InitializationService {
     public void init() {
 
         communicationService.initSubscriber(propagationServerAddresses, NodeType.TrustScoreNode);
-
         baseNodeInitializationService.init();
 
     }
