@@ -3,7 +3,6 @@ package io.coti.trustscore.services;
 import io.coti.basenode.crypto.BaseTransactionCrypto;
 import io.coti.basenode.crypto.NodeCryptoHelper;
 import io.coti.basenode.data.*;
-import io.coti.basenode.http.BaseResponse;
 import io.coti.basenode.http.Response;
 import io.coti.trustscore.http.RollingReserveRequest;
 import io.coti.trustscore.http.RollingReserveResponse;

@@ -1,6 +1,5 @@
 package io.coti.trustscore.controllers;
 
-import io.coti.basenode.http.BaseResponse;
 import io.coti.basenode.http.Response;
 import io.coti.trustscore.http.RollingReserveRequest;
 import io.coti.trustscore.http.RollingReserveValidateRequest;
