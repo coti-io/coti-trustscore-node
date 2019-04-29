@@ -2,6 +2,7 @@ package io.coti.trustscore.services;
 
 
 import io.coti.basenode.data.TransactionData;
+import io.coti.basenode.data.TransactionType;
 import io.coti.basenode.services.BaseNodeConfirmationService;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.context.annotation.Primary;
@@ -16,6 +17,8 @@ public class ConfirmationService extends BaseNodeConfirmationService {
 
     @Override
     protected void continueHandleAddressHistoryChanges(TransactionData transactionData) {
-        trustScoreService.addTransactionToTsCalculation(transactionData);
+        if (!transactionData.getType().equals(TransactionType.ZeroSpend)) {
+            trustScoreService.addTransactionToTsCalculation(transactionData);
+        }
     }
 }

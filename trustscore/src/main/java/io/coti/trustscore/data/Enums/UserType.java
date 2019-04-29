@@ -1,18 +1,30 @@
 package io.coti.trustscore.data.Enums;
 
-import javax.xml.bind.annotation.XmlEnum;
-import javax.xml.bind.annotation.XmlEnumValue;
-import javax.xml.bind.annotation.XmlType;
-
-@XmlType(name = "type")
-@XmlEnum
 public enum UserType {
-    @XmlEnumValue("merchant")
-    MERCHANT,
+    CONSUMER("consumer"),
+    MERCHANT("merchant"),
+    ARBITRATOR("arbitrator"),
+    FULL_NODE("fullnode"),
+    DSP_NODE("dspnode"),
+    TRUST_SCORE_NODE("trustscorenode");
 
-    @XmlEnumValue("wallet")
-    WALLET,
+    private String text;
 
-    @XmlEnumValue("node")
-    FULL_NODE
+    UserType(String text) {
+        this.text = text;
+    }
+
+    public static UserType enumFromString(String text) {
+        for (UserType value : UserType.values()) {
+            if (value.text.equalsIgnoreCase(text)) {
+                return value;
+            }
+        }
+        throw new IllegalArgumentException(String.format("User type {} doesn't exist", text));
+    }
+
+    @Override
+    public String toString() {
+        return text;
+    }
 }

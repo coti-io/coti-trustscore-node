@@ -12,5 +12,6 @@ public class RollingReserveValidateRequest {
     NetworkFeeData networkFeeData;
     @NotNull
     RollingReserveData rollingReserveData;
-
+    @NotNull
+    String merchantHash;
 }
