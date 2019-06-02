@@ -44,10 +44,7 @@ import java.security.spec.InvalidKeySpecException;
 import java.time.Instant;
 import java.time.LocalDate;
 import java.time.ZoneId;
-import java.util.ArrayList;
-import java.util.Date;
-import java.util.List;
-import java.util.Map;
+import java.util.*;
 
 import static io.coti.basenode.http.BaseNodeHttpStringConstants.API_SERVER_ERROR;
 import static io.coti.basenode.http.BaseNodeHttpStringConstants.INVALID_SIGNER;
@@ -179,6 +176,7 @@ public class TrustScoreService {
 
     private boolean changingIsLegal(TrustScoreData trustScoreData) {
         return trustScoreData.getUserType().equals(UserType.CONSUMER);
+//        return true; // not commit this trustScoreData.getUserType().equals(UserType.CONSUMER);
     }
 
     public ResponseEntity<IResponse> getUserTrustScore(Hash userHash) {
@@ -225,11 +223,35 @@ public class TrustScoreService {
         return ResponseEntity.status(HttpStatus.OK).body(getTransactionTrustScoreResponse);
     }
 
+    public ResponseEntity<IResponse> getUserTrustScoreComponents(Hash userHash) {
+        TrustScoreData trustScoreData = trustScores.getByHash(userHash);
+        if (trustScoreData == null) {
+            return ResponseEntity
+                    .status(HttpStatus.BAD_REQUEST)
+                    .body(new Response(NON_EXISTING_USER_MESSAGE, STATUS_ERROR));
+        }
+
+        List<BucketEventData> bucketEventDataList = new ArrayList<BucketEventData>();
+        for (IBucketEventService bucketEventService : bucketEventServiceList) {
+            BucketEventData bucketEventData =
+                    (BucketEventData) bucketEvents.getByHash(trustScoreData.getEventTypeToBucketHashMap().get(bucketEventService.getBucketEventType()));
+            bucketEventDataList.add(bucketEventData);
+        }
+
+        GetUserTrustScoreComponentsResponse getUserTrustScoreComponentsResponse = new GetUserTrustScoreComponentsResponse(trustScoreData, bucketEventDataList);
+        return ResponseEntity.status(HttpStatus.OK).body(getUserTrustScoreComponentsResponse);
+    }
+
     public ResponseEntity<IResponse> setKycTrustScore(SetKycTrustScoreRequest request) {
         SetKycTrustScoreResponse kycTrustScoreResponse;
 
         try {
             log.info("Setting KYC trust score: userHash =  {}, KTS = {}, userType =  {}", request.userHash, request.kycTrustScore, request.userType);
+            if (request.kycTrustScore <= 0 || request.kycTrustScore > 100) {
+                return ResponseEntity
+                        .status(HttpStatus.BAD_REQUEST)
+                        .body(new Response(KYC_TRUST_INCORRECT_VALUE, STATUS_ERROR));
+            }
             TrustScoreData newTrustScoreData = new TrustScoreData(request.userHash,
                     request.kycTrustScore,
                     request.signature,
@@ -283,28 +305,7 @@ public class TrustScoreService {
 
     public synchronized void addTransactionToTsCalculation(TransactionData transactionData) {
         try {
-            TrustScoreData trustScoreData = trustScores.getByHash(transactionData.getSenderHash());
-            ;
-
-            if (trustScoreData == null) {
-                log.error("Transaction can not be added to TS calculation: User {} doesn't exist", transactionData.getSenderHash());
-                return;
-            }
-
-            BucketEventData bucketEventData
-                    = (BucketEventData) bucketEvents.getByHash(getBucketHashByUserHashAndEventType(transactionData.getSenderHash(), EventType.TRANSACTION));
-            if (bucketEventData == null) {
-                log.error("Transaction can not be added to TS calculation: bucket event data doesn't exist for user {}", transactionData.getSenderHash());
-                return;
-            }
-
-            if (bucketEventData.getEventDataHashToEventDataMap().get(transactionData.getHash()) != null) {
-                log.debug("Transaction {} is already added to ts calculation", transactionData.getHash());
-                return;
-            }
-
-
-            if (transactionData.getType().equals(TransactionType.ZeroSpend) || transactionData.getDspConsensusResult() == null ||
+            if (EnumSet.of(TransactionType.ZeroSpend, TransactionType.Initial).contains(transactionData.getType()) || transactionData.getDspConsensusResult() == null ||
                     !transactionData.getDspConsensusResult().isDspConsensus()) {
                 return;
             }
@@ -313,11 +314,40 @@ public class TrustScoreService {
             LocalDate currentDate = new Date().toInstant().atZone(ZoneId.systemDefault()).toLocalDate();
 
             if (currentDate.equals(transactionConsensusDate)) {
-                addToTransactionBucketsCalculation(trustScoreData, transactionData);
+                if (transactionData.getSenderHash() != null) {
+                    addTransactionToUserTs(transactionData, transactionData.getSenderHash());
+                }
+                if (transactionData.getNodeHash() != null) {
+                    addTransactionToUserTs(transactionData, transactionData.getNodeHash());
+                }
             }
         } catch (Exception e) {
             e.printStackTrace();
         }
+
+    }
+
+    private void addTransactionToUserTs(TransactionData transactionData, Hash userHash) {
+        TrustScoreData trustScoreData = trustScores.getByHash(userHash);
+
+        if (trustScoreData == null) {
+            log.error("Transaction can not be added to TS calculation: User {} doesn't exist", userHash);
+            return;
+        }
+
+        BucketEventData bucketEventData
+                = (BucketEventData) bucketEvents.getByHash(getBucketHashByUserHashAndEventType(userHash, EventType.TRANSACTION));
+        if (bucketEventData == null) {
+            log.error("Transaction can not be added to TS calculation: bucket event data doesn't exist for user {}", userHash);
+            return;
+        }
+
+        if (bucketEventData.getEventDataHashToEventDataMap().get(transactionData.getHash()) != null) {
+            log.debug("Transaction {} is already added to ts calculation", transactionData.getHash());
+            return;
+        }
+
+        addToTransactionBucketsCalculation(trustScoreData, transactionData);
 
     }
 

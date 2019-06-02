@@ -3,7 +3,6 @@ package io.coti.trustscore.controllers;
 import io.coti.basenode.http.GetTrustScoreRequest;
 import io.coti.basenode.http.interfaces.IResponse;
 import io.coti.trustscore.http.GetTransactionTrustScoreRequest;
-import io.coti.trustscore.http.InsertEventRequest;
 import io.coti.trustscore.http.SetKycTrustScoreRequest;
 import io.coti.trustscore.http.SetUserTypeRequest;
 import io.coti.trustscore.services.TrustScoreService;
@@ -47,5 +46,10 @@ public class TrustScoreController {
     @RequestMapping(path = "/usertype", method = RequestMethod.PUT)
     public ResponseEntity<IResponse> setUserType(@Valid @RequestBody SetUserTypeRequest request) {
         return trustScoreService.setUserType(request);
+    }
+
+    @RequestMapping(path = "/usertscomponents", method = RequestMethod.POST)
+    public ResponseEntity<IResponse> getUserTrustScoreComponents(@Valid @RequestBody GetTrustScoreRequest request) {
+        return trustScoreService.getUserTrustScoreComponents(request.userHash);
     }
 }
