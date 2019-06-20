@@ -196,7 +196,7 @@ public class TrustScoreService {
 
         try {
             PublicKey publicKey = CryptoHelper.getPublicKeyFromHexString(userHash.toHexString());
-            if (!CryptoHelper.VerifyByPublicKey(transactionHash.getBytes(), signatureData.getR(), signatureData.getS(), publicKey)) {
+            if (!CryptoHelper.verifyByPublicKey(transactionHash.getBytes(), signatureData.getR(), signatureData.getS(), publicKey)) {
                 return ResponseEntity
                         .status(HttpStatus.BAD_REQUEST).body(new Response(BAD_SIGNATURE_ON_TRUST_SCORE_FOR_TRANSACTION));
             }
@@ -303,6 +303,31 @@ public class TrustScoreService {
         }
     }
 
+    public ResponseEntity<IResponse> setUserZeroTrustFlag(SetUserZeroTrustFlagRequest request) {
+
+        try {
+            log.info("Setting Zero Trust Flag: userHash =  {}, ZTF = {}", request.getUserHash(), request.isZeroTrustFlag());
+
+            TrustScoreData trustScoreData = trustScores.getByHash(request.getUserHash());
+            if (trustScoreData == null) {
+                return ResponseEntity
+                        .status(HttpStatus.BAD_REQUEST)
+                        .body(new Response(NON_EXISTING_USER_MESSAGE, STATUS_ERROR));
+            } else {
+                trustScoreData.setZeroTrustFlag(request.isZeroTrustFlag());
+                trustScores.put(trustScoreData);
+
+                return ResponseEntity.status(HttpStatus.OK)
+                        .body(new SetUserZeroTrustFlagResponse(trustScoreData));
+            }
+        } catch (Exception e) {
+            log.error(e.getMessage());
+            return ResponseEntity
+                    .status(HttpStatus.INTERNAL_SERVER_ERROR)
+                    .body(new Response(ZERO_TRUST_FLAG_ERROR, STATUS_ERROR));
+        }
+    }
+
     public synchronized void addTransactionToTsCalculation(TransactionData transactionData) {
         try {
             if (EnumSet.of(TransactionType.ZeroSpend, TransactionType.Initial).contains(transactionData.getType()) || transactionData.getDspConsensusResult() == null ||
@@ -402,6 +427,10 @@ public class TrustScoreService {
     }
 
     public double calculateUserTrustScore(TrustScoreData trustScoreData) {
+
+        if (trustScoreData.getZeroTrustFlag() != null && trustScoreData.getZeroTrustFlag()) {
+            return 0;
+        }
 
         double eventsTrustScore = 10;
 
