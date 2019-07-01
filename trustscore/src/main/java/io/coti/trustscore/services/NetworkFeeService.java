@@ -6,6 +6,7 @@ import io.coti.basenode.data.*;
 import io.coti.basenode.http.Response;
 import io.coti.basenode.http.interfaces.IResponse;
 import io.coti.basenode.services.TransactionHelper;
+import io.coti.basenode.services.interfaces.IValidationService;
 import io.coti.trustscore.config.rules.UserNetworkFeeByTrustScoreRange;
 import io.coti.trustscore.data.Enums.TrustScoreRangeType;
 import io.coti.trustscore.data.TrustScoreData;
@@ -22,14 +23,14 @@ import org.springframework.http.ResponseEntity;
 import org.springframework.stereotype.Service;
 
 import java.math.BigDecimal;
+import java.math.RoundingMode;
 import java.time.Instant;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
 import static io.coti.basenode.http.BaseNodeHttpStringConstants.STATUS_ERROR;
-import static io.coti.trustscore.http.HttpStringConstants.FULL_NODE_FEE_VALIDATION_ERROR;
-import static io.coti.trustscore.http.HttpStringConstants.TRUST_SCORE_NOT_EXIST;
+import static io.coti.trustscore.http.HttpStringConstants.*;
 
 @Slf4j
 @Service
@@ -41,28 +42,34 @@ public class NetworkFeeService {
     private BigDecimal networkFeeDifferenceValidation;
     @Autowired
     private TransactionHelper transactionHelper;
-
     @Autowired
     private TrustScores trustScores;
-
-
+    @Autowired
+    private IValidationService validationService;
     @Autowired
     private TrustScoreService trustScoreService;
-
 
     public ResponseEntity<IResponse> createNetworkFee(NetworkFeeRequest networkFeeRequest) {
         try {
             FullNodeFeeData fullNodeFeeData = networkFeeRequest.getFullNodeFeeData();
-            if (!validateFullNodeFee(fullNodeFeeData)) {
+            boolean feeIncluded = networkFeeRequest.isFeeIncluded();
+            if (!validateFullNodeFee(fullNodeFeeData, feeIncluded)) {
                 return ResponseEntity
                         .status(HttpStatus.BAD_REQUEST)
                         .body(new Response(FULL_NODE_FEE_VALIDATION_ERROR,
                                 STATUS_ERROR));
             }
 
-
             BigDecimal originalAmount = fullNodeFeeData.getOriginalAmount();
-            BigDecimal reducedAmount = originalAmount.subtract(fullNodeFeeData.getAmount());
+            BigDecimal reducedAmount = null;
+
+            if (feeIncluded) {
+                reducedAmount = originalAmount.subtract(fullNodeFeeData.getAmount());
+
+                if (reducedAmount.scale() > 0) {
+                    reducedAmount = reducedAmount.stripTrailingZeros();
+                }
+            }
 
             TrustScoreData trustScoreData = trustScores.getByHash(networkFeeRequest.getUserHash());
             if (trustScoreData == null) {
@@ -70,7 +77,12 @@ public class NetworkFeeService {
             }
             double userTrustScore = trustScoreService.calculateUserTrustScore(trustScoreData);
 
-            BigDecimal fee = calculateNetworkFeeAmount(getUserNetworkFeeByTrustScoreRange(userTrustScore), reducedAmount);
+            BigDecimal fee = calculateNetworkFeeAmount(getUserNetworkFeeByTrustScoreRange(userTrustScore), originalAmount);
+
+            if (reducedAmount != null && reducedAmount.compareTo(fee) <= 0) {
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new Response(INVALID_REDUCED_AMOUNT_VS_NETWORK_FEE, STATUS_ERROR));
+            }
+
             NetworkFeeData networkFeeData = new NetworkFeeData(networkFeeAddress, fee, originalAmount, reducedAmount, Instant.now());
             setNetworkFeeHash(networkFeeData);
             signNetworkFee(networkFeeData, true);
@@ -86,14 +98,16 @@ public class NetworkFeeService {
     public ResponseEntity<IResponse> validateNetworkFee(NetworkFeeValidateRequest networkFeeValidateRequest) {
         try {
             FullNodeFeeData fullNodeFeeData = networkFeeValidateRequest.getFullNodeFeeData();
-            if (!validateFullNodeFee(fullNodeFeeData)) {
+            boolean feeIncluded = networkFeeValidateRequest.isFeeIncluded();
+
+            if (!validateFullNodeFee(fullNodeFeeData, feeIncluded)) {
                 return ResponseEntity
                         .status(HttpStatus.BAD_REQUEST)
                         .body(new Response(FULL_NODE_FEE_VALIDATION_ERROR, STATUS_ERROR));
             }
 
             NetworkFeeData networkFeeData = networkFeeValidateRequest.getNetworkFeeData();
-            boolean isValid = isNetworkFeeValid(networkFeeData, fullNodeFeeData.getAmount(), networkFeeValidateRequest.getUserHash());
+            boolean isValid = isNetworkFeeValid(networkFeeData, fullNodeFeeData, networkFeeValidateRequest.getUserHash(), feeIncluded);
             signNetworkFee(networkFeeData, isValid);
             return ResponseEntity.status(HttpStatus.OK)
                     .body(new NetworkFeeResponse(new NetworkFeeResponseData(networkFeeData)));
@@ -103,15 +117,21 @@ public class NetworkFeeService {
         }
     }
 
-    private boolean validateFullNodeFee(FullNodeFeeData fullNodeFeeData) {
+    private boolean validateFullNodeFee(FullNodeFeeData fullNodeFeeData, boolean feeIncluded) {
         List<BaseTransactionData> baseTransactions = new ArrayList<>();
         baseTransactions.add(fullNodeFeeData);
-        return BaseTransactionCrypto.FullNodeFeeData.isBaseTransactionValid(new TransactionData(baseTransactions), fullNodeFeeData);
+        return validationService.validateAmountField(fullNodeFeeData.getAmount()) && validationService.validateAmountField(fullNodeFeeData.getOriginalAmount())
+                && (!feeIncluded || fullNodeFeeData.getOriginalAmount().compareTo(fullNodeFeeData.getAmount()) > 0)
+                && BaseTransactionCrypto.FullNodeFeeData.isBaseTransactionValid(new TransactionData(baseTransactions), fullNodeFeeData);
     }
 
-    private boolean isNetworkFeeValid(NetworkFeeData networkFeeData, BigDecimal fullNodeFeeAmount, Hash userHash) {
+    private boolean isNetworkFeeValid(NetworkFeeData networkFeeData, FullNodeFeeData fullNodeFeeData, Hash userHash, boolean feeIncluded) {
 
-        return networkFeeData.getReducedAmount().equals(networkFeeData.getOriginalAmount().subtract(fullNodeFeeAmount))
+        return validationService.validateAmountField(networkFeeData.getAmount())
+                && networkFeeData.getOriginalAmount().equals(fullNodeFeeData.getOriginalAmount())
+                && (!feeIncluded || (validationService.validateAmountField(networkFeeData.getReducedAmount())
+                && networkFeeData.getReducedAmount().equals(networkFeeData.getOriginalAmount().subtract(fullNodeFeeData.getAmount()).stripTrailingZeros())
+                && networkFeeData.getReducedAmount().compareTo(networkFeeData.getAmount()) > 0))
                 && isNetworkFeeValid(networkFeeData, userHash);
     }
 
@@ -124,7 +144,7 @@ public class NetworkFeeService {
         }
         double userTrustScore = trustScoreService.calculateUserTrustScore(trustScoreData);
 
-        BigDecimal calculatedNetworkFee = calculateNetworkFeeAmount(getUserNetworkFeeByTrustScoreRange(userTrustScore), networkFeeData.getReducedAmount());
+        BigDecimal calculatedNetworkFee = calculateNetworkFeeAmount(getUserNetworkFeeByTrustScoreRange(userTrustScore), networkFeeData.getOriginalAmount());
         int compareResult = networkFeeDifferenceValidation.compareTo(calculatedNetworkFee.subtract(networkFeeData.getAmount()).abs());
         return compareResult >= 0 && validateNetworkFeeCrypto(networkFeeData);
     }
@@ -136,7 +156,10 @@ public class NetworkFeeService {
     }
 
     public boolean validateNetworkFee(NetworkFeeData networkFeeData) {
-        return validateNetworkFeeCrypto(networkFeeData) && transactionHelper.validateBaseTransactionTrustScoreNodeResult(networkFeeData);
+        return validationService.validateAmountField(networkFeeData.getOriginalAmount())
+                && validationService.validateAmountField(networkFeeData.getAmount())
+                && validationService.validateAmountField(networkFeeData.getReducedAmount())
+                && validateNetworkFeeCrypto(networkFeeData) && transactionHelper.validateBaseTransactionTrustScoreNodeResult(networkFeeData);
     }
 
     public void setNetworkFeeHash(NetworkFeeData networkFeeData) throws ClassNotFoundException {
@@ -163,9 +186,15 @@ public class NetworkFeeService {
     }
 
     private BigDecimal calculateNetworkFeeAmount(UserNetworkFeeByTrustScoreRange userNetworkFeeByTrustScoreRange, BigDecimal amount) {
-        // formula calculation:
-        return ((amount.multiply(userNetworkFeeByTrustScoreRange.getFeeRate())).divide(new BigDecimal(100)).max(userNetworkFeeByTrustScoreRange.getMinRate())).
+        BigDecimal fee = ((amount.multiply(userNetworkFeeByTrustScoreRange.getFeeRate())).divide(new BigDecimal(100)).max(userNetworkFeeByTrustScoreRange.getMinRate())).
                 min(userNetworkFeeByTrustScoreRange.getMaxRate());
+        if (fee.scale() > 8) {
+            fee = fee.setScale(8, RoundingMode.DOWN);
+        }
+        if (fee.scale() > 0) {
+            fee = fee.stripTrailingZeros();
+        }
+        return fee;
     }
 
 }
