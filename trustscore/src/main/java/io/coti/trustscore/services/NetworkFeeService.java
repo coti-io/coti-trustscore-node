@@ -80,7 +80,7 @@ public class NetworkFeeService {
             BigDecimal fee = calculateNetworkFeeAmount(getUserNetworkFeeByTrustScoreRange(userTrustScore), originalAmount);
 
             if (reducedAmount != null && reducedAmount.compareTo(fee) <= 0) {
-                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new Response(INVALID_REDUCED_AMOUNT_VS_NETWORK_FEE, STATUS_ERROR));
+                return ResponseEntity.status(HttpStatus.BAD_REQUEST).body(new Response(String.format(INVALID_REDUCED_AMOUNT_VS_NETWORK_FEE, fee.add(fullNodeFeeData.getAmount()).toPlainString()), STATUS_ERROR));
             }
 
             NetworkFeeData networkFeeData = new NetworkFeeData(networkFeeAddress, fee, originalAmount, reducedAmount, Instant.now());
@@ -126,18 +126,16 @@ public class NetworkFeeService {
     }
 
     private boolean isNetworkFeeValid(NetworkFeeData networkFeeData, FullNodeFeeData fullNodeFeeData, Hash userHash, boolean feeIncluded) {
-
+        BigDecimal reducedAmount = networkFeeData.getOriginalAmount().subtract(fullNodeFeeData.getAmount());
         return validationService.validateAmountField(networkFeeData.getAmount())
                 && networkFeeData.getOriginalAmount().equals(fullNodeFeeData.getOriginalAmount())
                 && (!feeIncluded || (validationService.validateAmountField(networkFeeData.getReducedAmount())
-                && networkFeeData.getReducedAmount().equals(networkFeeData.getOriginalAmount().subtract(fullNodeFeeData.getAmount()).stripTrailingZeros())
+                && networkFeeData.getReducedAmount().equals(reducedAmount.scale() > 0 ? reducedAmount.stripTrailingZeros() : reducedAmount)
                 && networkFeeData.getReducedAmount().compareTo(networkFeeData.getAmount()) > 0))
                 && isNetworkFeeValid(networkFeeData, userHash);
     }
 
     public boolean isNetworkFeeValid(NetworkFeeData networkFeeData, Hash userHash) {
-
-
         TrustScoreData trustScoreData = trustScores.getByHash(userHash);
         if (trustScoreData == null) {
             return false;
