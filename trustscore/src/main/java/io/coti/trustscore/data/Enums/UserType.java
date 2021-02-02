@@ -8,7 +8,7 @@ public enum UserType {
     DSP_NODE("dspnode"),
     TRUST_SCORE_NODE("trustscorenode");
 
-    private String text;
+    private final String text;
 
     UserType(String text) {
         this.text = text;
@@ -20,7 +20,7 @@ public enum UserType {
                 return value;
             }
         }
-        throw new IllegalArgumentException(String.format("User type {} doesn't exist", text));
+        throw new IllegalArgumentException(String.format("User type %s doesn't exist", text));
     }
 
     @Override

@@ -5,7 +5,7 @@
     <parent>
         <artifactId>coti-node</artifactId>
         <groupId>io.coti</groupId>
-        <version>1.0.2-SNAPSHOT</version>
+        <version>1.5.0.RELEASE</version>
     </parent>
 
 
@@ -16,7 +16,7 @@
         <dependency>
             <groupId>io.coti</groupId>
             <artifactId>basenode</artifactId>
-            <version>1.0.2-SNAPSHOT</version>
+            <version>1.5.0.RELEASE</version>
             <scope>compile</scope>
         </dependency>
         <dependency>
@@ -47,12 +47,6 @@
             <groupId>org.mariuszgromada.math</groupId>
             <artifactId>MathParser.org-mXparser</artifactId>
             <version>4.2.0</version>
-        </dependency>
-        <dependency>
-            <groupId>junit</groupId>
-            <artifactId>junit</artifactId>
-            <version>4.12</version>
-            <scope>test</scope>
         </dependency>
     </dependencies>
 

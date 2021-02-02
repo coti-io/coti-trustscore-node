@@ -12,7 +12,7 @@ public enum BehaviorEventsScoreType {
 
     SMART_CONTRACT_EXECUTION_EVADING("SmartContractExecutionEvading");
 
-    private String text;
+    private final String text;
 
     BehaviorEventsScoreType(String text) {
         this.text = text;
@@ -24,7 +24,7 @@ public enum BehaviorEventsScoreType {
                 return value;
             }
         }
-        throw new IllegalArgumentException(String.format("got event name {}, which not exists", text));
+        throw new IllegalArgumentException(String.format("got event name %s, which not exists", text));
     }
 
     @Override

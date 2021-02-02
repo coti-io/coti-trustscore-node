@@ -47,7 +47,7 @@ public class BucketInitialTrustScoreEventsServiceTest {
     public void addEventToCalculationsSimpleTest() {
         addInitialTrustScoreEvents();
         double bucketSumScore = bucketInitialTrustScoreEventsService.getBucketSumScore(bucketInitialTrustScoreEventsData);
-        isTrustScoreValueValid(bucketSumScore);
+        Assert.assertTrue(isTrustScoreValueValid(bucketSumScore));
     }
 
     @Test
@@ -84,10 +84,10 @@ public class BucketInitialTrustScoreEventsServiceTest {
     private InsertEventRequest buildInitialTrustScoreEventsDataRequest(InitialTrustScoreType initialTrustScoreType, double chargeBackAmount) {
         InsertEventRequest insertEventRequest = new InsertEventRequest();
         insertEventRequest.setUserHash(generateRandomHash(64));
-        insertEventRequest.eventType = EventType.INITIAL_EVENT;
+        insertEventRequest.setEventType(EventType.INITIAL_EVENT);
         insertEventRequest.setScore(chargeBackAmount);
         insertEventRequest.setInitialTrustScoreType(initialTrustScoreType);
-        insertEventRequest.uniqueIdentifier = generateRandomHash(72);
+        insertEventRequest.setUniqueIdentifier(generateRandomHash(72));
         return insertEventRequest;
     }
 }

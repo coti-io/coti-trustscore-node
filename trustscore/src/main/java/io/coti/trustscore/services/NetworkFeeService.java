@@ -91,8 +91,8 @@ public class NetworkFeeService {
             return ResponseEntity.status(HttpStatus.CREATED)
                     .body(new NetworkFeeResponse(networkFeeResponseData));
         } catch (Exception e) {
-            log.error(e.getMessage());
-            throw new RuntimeException(e);
+            log.error("{}: {}", e.getClass().getName(), e.getMessage());
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new Response(e.getMessage(), STATUS_ERROR));
         }
     }
 
@@ -113,8 +113,7 @@ public class NetworkFeeService {
             return ResponseEntity.status(HttpStatus.OK)
                     .body(new NetworkFeeResponse(new NetworkFeeResponseData(networkFeeData)));
         } catch (Exception e) {
-            log.error(e.getMessage());
-            throw new RuntimeException(e);
+            return ResponseEntity.status(HttpStatus.INTERNAL_SERVER_ERROR).body(new Response(e.getMessage(), STATUS_ERROR));
         }
     }
 
@@ -123,7 +122,7 @@ public class NetworkFeeService {
         baseTransactions.add(fullNodeFeeData);
         return validationService.validateAmountField(fullNodeFeeData.getAmount()) && validationService.validateAmountField(fullNodeFeeData.getOriginalAmount())
                 && (!feeIncluded || fullNodeFeeData.getOriginalAmount().compareTo(fullNodeFeeData.getAmount()) > 0)
-                && BaseTransactionCrypto.FullNodeFeeData.isBaseTransactionValid(new TransactionData(baseTransactions), fullNodeFeeData);
+                && BaseTransactionCrypto.FULL_NODE_FEE_DATA.isBaseTransactionValid(new TransactionData(baseTransactions), fullNodeFeeData);
     }
 
     private boolean isNetworkFeeValid(NetworkFeeData networkFeeData, FullNodeFeeData fullNodeFeeData, Hash userHash, boolean feeIncluded) {
@@ -136,7 +135,7 @@ public class NetworkFeeService {
                 && isNetworkFeeValid(networkFeeData, userHash);
     }
 
-    public boolean isNetworkFeeValid(NetworkFeeData networkFeeData, Hash userHash) {
+    private boolean isNetworkFeeValid(NetworkFeeData networkFeeData, Hash userHash) {
         TrustScoreData trustScoreData = trustScores.getByHash(userHash);
         if (trustScoreData == null) {
             return false;
@@ -151,7 +150,7 @@ public class NetworkFeeService {
     private boolean validateNetworkFeeCrypto(NetworkFeeData networkFeeData) {
         List<BaseTransactionData> baseTransactions = new ArrayList<>();
         baseTransactions.add(networkFeeData);
-        return BaseTransactionCrypto.NetworkFeeData.isBaseTransactionValid(new TransactionData(baseTransactions), networkFeeData);
+        return BaseTransactionCrypto.NETWORK_FEE_DATA.isBaseTransactionValid(new TransactionData(baseTransactions), networkFeeData);
     }
 
     public boolean validateNetworkFee(NetworkFeeData networkFeeData) {
@@ -161,15 +160,15 @@ public class NetworkFeeService {
                 && validateNetworkFeeCrypto(networkFeeData) && transactionHelper.validateBaseTransactionTrustScoreNodeResult(networkFeeData);
     }
 
-    public void setNetworkFeeHash(NetworkFeeData networkFeeData) throws ClassNotFoundException {
-        BaseTransactionCrypto.NetworkFeeData.setBaseTransactionHash(networkFeeData);
+    private void setNetworkFeeHash(NetworkFeeData networkFeeData) {
+        BaseTransactionCrypto.NETWORK_FEE_DATA.createAndSetBaseTransactionHash(networkFeeData);
     }
 
 
-    public void signNetworkFee(NetworkFeeData networkFeeData, boolean isValid) throws ClassNotFoundException {
+    private void signNetworkFee(NetworkFeeData networkFeeData, boolean isValid) {
         List<BaseTransactionData> baseTransactions = new ArrayList<>();
         baseTransactions.add(networkFeeData);
-        BaseTransactionCrypto.NetworkFeeData.signMessage(new TransactionData(baseTransactions), networkFeeData, new TrustScoreNodeResultData(NodeCryptoHelper.getNodeHash(), isValid));
+        BaseTransactionCrypto.NETWORK_FEE_DATA.signMessage(new TransactionData(baseTransactions), networkFeeData, new TrustScoreNodeResultData(NodeCryptoHelper.getNodeHash(), isValid));
     }
 
 

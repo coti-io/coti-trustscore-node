@@ -5,7 +5,7 @@ public enum InitialTrustScoreType {
     GENERAL_QUESTIONNAIRE("GeneralQuestionnaire"),
     MERCHANT_QUESTIONNAIRE("MerchantQuestionnaire");
 
-    private String text;
+    private final String text;
 
     InitialTrustScoreType(String text) {
         this.text = text;
@@ -17,7 +17,7 @@ public enum InitialTrustScoreType {
                 return value;
             }
         }
-        throw new IllegalArgumentException(String.format("got event name {}, which not exists", text));
+        throw new IllegalArgumentException(String.format("got event name %s, which not exists", text));
     }
 
     @Override

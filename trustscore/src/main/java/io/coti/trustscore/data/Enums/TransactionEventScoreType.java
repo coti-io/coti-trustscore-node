@@ -6,7 +6,7 @@ public enum TransactionEventScoreType {
     TURNOVER("Turnover"),
     AVERAGE_BALANCE("AverageBalance");
 
-    private String text;
+    private final String text;
 
     TransactionEventScoreType(String text) {
         this.text = text;
@@ -18,7 +18,7 @@ public enum TransactionEventScoreType {
                 return value;
             }
         }
-        throw new IllegalArgumentException(String.format("got event name {}, which not exists", text));
+        throw new IllegalArgumentException(String.format("got event name %s, which not exists", text));
     }
 
     @Override

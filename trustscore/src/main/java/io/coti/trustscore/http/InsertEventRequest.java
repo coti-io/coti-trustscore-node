@@ -3,7 +3,7 @@ package io.coti.trustscore.http;
 import io.coti.basenode.data.Hash;
 import io.coti.basenode.data.SignatureData;
 import io.coti.basenode.data.TransactionData;
-import io.coti.basenode.http.Request;
+import io.coti.basenode.http.interfaces.IRequest;
 import io.coti.trustscore.data.Enums.*;
 import lombok.Data;
 
@@ -11,23 +11,19 @@ import javax.validation.constraints.NotNull;
 import java.time.Instant;
 
 @Data
-public class InsertEventRequest extends Request {
+public class InsertEventRequest implements IRequest {
 
     @NotNull
-    public Instant eventDate;
-
+    private Instant eventDate;
     @NotNull
-    public Hash userHash;
-
+    private Hash userHash;
     @NotNull
-    public EventType eventType;
+    private EventType eventType;
     @NotNull
-    public Hash signerHash;
+    private Hash signerHash;
     @NotNull
-    public SignatureData signature;
-
-    public Hash uniqueIdentifier;
-
+    private SignatureData signature;
+    private Hash uniqueIdentifier;
     private BehaviorEventsScoreType behaviorEventsScoreType;
     private InitialTrustScoreType initialTrustScoreType;
     private HighFrequencyEventScoreType highFrequencyEventScoreType;

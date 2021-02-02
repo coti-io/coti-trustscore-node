@@ -7,7 +7,7 @@ public enum HighFrequencyEventScoreType {
     CHARGE_BACK_AMOUNT("ChargeBackAmount"),
     CHARGE_BACK_NUMBER("ChargeBackNumber");
 
-    private String text;
+    private final String text;
 
     HighFrequencyEventScoreType(String text) {
         this.text = text;
@@ -19,7 +19,7 @@ public enum HighFrequencyEventScoreType {
                 return value;
             }
         }
-        throw new IllegalArgumentException(String.format("got event name {}, which not exists", text));
+        throw new IllegalArgumentException(String.format("got event name %s, which not exists", text));
     }
 
     @Override
